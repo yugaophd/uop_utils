@@ -12,6 +12,8 @@ from .metadata import (
     add_metadata_comments,
     fix_waveglider_issues,
     get_git_governance_info,
+    get_uop_coare_details,
+    get_uop_coare_version,
     validate_time_range,
     write_git_provenance,
 )
@@ -21,6 +23,7 @@ from .plotting import (
     create_custom_figure_latex,
     create_figure_latex,
     create_two_figure_page_latex,
+    plot_coare_input_multipanel,
 )
 from .qc import remove_spikes
 
@@ -37,8 +40,11 @@ __all__ = [
     'create_figure_latex',
     'create_two_figure_page_latex',
     'extract_campaign_names',
+    'plot_coare_input_multipanel',
     'fix_waveglider_issues',
     'get_git_governance_info',
+    'get_uop_coare_details',
+    'get_uop_coare_version',
     'is_directional_variable',
     'remove_spikes',
     'update_encoding',

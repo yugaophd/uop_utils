@@ -11,6 +11,42 @@ from typing import Optional
 import numpy as np
 
 
+def get_uop_coare_details():
+    """Return version and import details for uop-coare."""
+    details = {
+        'version': None,
+        'dist_name': None,
+        'dist_path': None,
+        'module_path': None,
+        'python_executable': os.sys.executable,
+    }
+
+    for dist_name in ('uop-coare', 'uop_coare'):
+        try:
+            dist = importlib_metadata.distribution(dist_name)
+            details['version'] = dist.version
+            details['dist_name'] = dist.metadata['Name'] or dist_name
+            details['dist_path'] = str(dist.locate_file(''))
+            break
+        except importlib_metadata.PackageNotFoundError:
+            continue
+
+    try:
+        import uop_coare
+        details['module_path'] = getattr(uop_coare, '__file__', None)
+        if not details['version']:
+            details['version'] = getattr(uop_coare, '__version__', None)
+    except Exception:
+        pass
+
+    return details
+
+
+def get_uop_coare_version():
+    """Return the installed uop-coare version string if available."""
+    return get_uop_coare_details()['version']
+
+
 def get_git_governance_info(repo_path: Optional[str] = None, script_path: Optional[str] = None, status_limit: int = 20) -> dict:
     """Collect git provenance metadata for processing-governance records."""
     repo_path = os.path.abspath(repo_path or os.getcwd())
@@ -67,19 +103,8 @@ def write_git_provenance(out_path):
     except subprocess.CalledProcessError:
         commit_meta, commit_subject, branch, remote_url = 'unavailable', '', 'unavailable', 'unavailable'
 
-    uop_coare_version = None
-    for dist_name in ('uop-coare', 'uop_coare'):
-        try:
-            uop_coare_version = importlib_metadata.version(dist_name)
-            break
-        except importlib_metadata.PackageNotFoundError:
-            continue
-    if not uop_coare_version:
-        try:
-            import uop_coare
-            uop_coare_version = getattr(uop_coare, '__version__', None)
-        except Exception:
-            pass
+    uop_coare_details = get_uop_coare_details()
+    uop_coare_version = uop_coare_details['version']
     if not uop_coare_version:
         raise RuntimeError('Unable to determine required uop-coare version. Install/import uop_coare before running processing.')
 

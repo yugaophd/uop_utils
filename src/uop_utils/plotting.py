@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import numpy as np
+from math import ceil
 
 
 def create_custom_figure_latex(image_path, caption, label, placement='!htbp', width='0.96\textwidth'):
@@ -81,3 +84,102 @@ def build_gap_aware_series(time_values, data_values, gap_factor=1.5):
             gap_times.append(gap_marker)
             gap_values.append(np.nan)
     return np.asarray(gap_times), np.asarray(gap_values)
+
+
+def plot_coare_input_multipanel(input_series, output_path):
+    """Create one multipanel plot with all Wave Glider input time series."""
+    if not input_series:
+        print("No COARE input time series available for plotting.")
+        return
+
+    variables = ['u', 't', 'rh', 'P', 'ts', 'rain', 'Ss', 'lat', 'lon']
+    ylabels = {
+        'u': 'Wind speed (m s$^{-1}$)',
+        't': 'Air temperature (degC)',
+        'rh': 'Relative humidity (%)',
+        'P': 'Pressure (hPa)',
+        'ts': 'Sea temperature (degC)',
+        'rain': 'Rain rate',
+        'Ss': 'Salinity (PSU)',
+        'lat': 'Latitude (deg)',
+        'lon': 'Longitude (deg)',
+    }
+    titles = {
+        'u': 'Wind speed',
+        't': 'Air temperature',
+        'rh': 'Relative humidity',
+        'P': 'Pressure',
+        'ts': 'Sea temperature',
+        'rain': 'Rain rate',
+        'Ss': 'Salinity',
+        'lat': 'Latitude',
+        'lon': 'Longitude',
+    }
+
+    ncols = 2
+    nrows = ceil(len(variables) / ncols)
+    panel_width = 6.0
+    panel_height = 3.0
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(panel_width * ncols, panel_height * nrows),
+        sharex=True,
+    )
+    axes = np.array(axes).reshape(-1)
+    date_locator = mdates.AutoDateLocator(minticks=3, maxticks=6)
+    date_formatter = mdates.ConciseDateFormatter(date_locator)
+
+    for i, var in enumerate(variables):
+        ax = axes[i]
+        for entry in input_series:
+            if var not in entry or len(entry[var]) == 0:
+                continue
+
+            time_values, data_values = build_gap_aware_series(entry['time'], entry[var])
+            if np.any(np.isfinite(np.asarray(data_values, dtype=float))):
+                ax.plot(
+                    time_values,
+                    data_values,
+                    linewidth=0.9,
+                    alpha=0.9,
+                    label=entry['waveglider_name'],
+                )
+
+        ax.set_title(titles.get(var, var))
+        ax.set_ylabel(ylabels.get(var, var))
+        ax.grid(True)
+        ax.xaxis.set_major_locator(date_locator)
+        ax.xaxis.set_major_formatter(date_formatter)
+        ax.tick_params(axis='x', labelrotation=30)
+        if i >= len(variables) - ncols:
+            ax.set_xlabel('Time')
+        else:
+            ax.tick_params(axis='x', labelbottom=False)
+
+    for j in range(len(variables), len(axes)):
+        axes[j].set_visible(False)
+
+    legend_panel_var = 'lat'
+    legend_idx = variables.index(legend_panel_var)
+    legend_ax = axes[legend_idx]
+    handles, labels = legend_ax.get_legend_handles_labels()
+    if handles:
+        nlegend_cols = 1 if len(labels) <= 4 else 2
+        legend_ax.legend(
+            handles,
+            labels,
+            loc='upper right',
+            fontsize=7,
+            frameon=True,
+            ncol=nlegend_cols,
+            borderaxespad=0.3,
+            handlelength=1.4,
+            labelspacing=0.25,
+        )
+
+    fig.tight_layout()
+    fig.subplots_adjust(hspace=0.35)
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    print(f"Saved COARE input multipanel figure: {output_path}")
