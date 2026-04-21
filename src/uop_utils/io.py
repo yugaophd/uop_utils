@@ -35,3 +35,12 @@ def update_encoding(ds):
             encoding[coord].update(zlib=True, complevel=4)
 
     return encoding
+
+
+import json
+
+
+def load_config(config_path):
+    """Load a JSON configuration file."""
+    with open(config_path, "r", encoding="utf-8") as f:
+        return json.load(f)

@@ -26,6 +26,29 @@ def calculate_angle_between_vectors(wind_u, wind_v, curr_u, curr_v):
     return angle_deg
 
 
+def compute_current_relative_wind(wind_speed, wind_direction_deg, current_east, current_north):
+    """Return wind adjusted for surface current where current is valid."""
+    wind_speed = np.asarray(wind_speed, dtype=float)
+    wind_direction_deg = np.asarray(wind_direction_deg, dtype=float)
+    current_east = np.asarray(current_east, dtype=float)
+    current_north = np.asarray(current_north, dtype=float)
+
+    wind_dir_rad = np.radians(wind_direction_deg)
+    wind_east = -wind_speed * np.sin(wind_dir_rad)
+    wind_north = -wind_speed * np.cos(wind_dir_rad)
+
+    rel_east = wind_east.copy()
+    rel_north = wind_north.copy()
+
+    valid_current = np.isfinite(current_east) & np.isfinite(current_north)
+    rel_east[valid_current] = wind_east[valid_current] - current_east[valid_current]
+    rel_north[valid_current] = wind_north[valid_current] - current_north[valid_current]
+
+    rel_speed = np.sqrt(rel_east ** 2 + rel_north ** 2)
+    rel_direction = np.degrees(np.arctan2(-rel_east, -rel_north)) % 360
+    return rel_speed, rel_direction, valid_current
+
+
 def circular_mean_resample(da, time_dim, freq='5min'):
     """Resample directional data using circular averaging."""
     rad_data = np.deg2rad(da)
@@ -51,7 +74,6 @@ def is_directional_variable(var_name, var_data=None):
             is_temperature = any(temp in units for temp in temperature_indicators)
             if not is_temperature:
                 return True
-
     directional_keywords = [
         'direction', 'dir', 'heading', 'bearing', 'azimuth', 'course',
         'wind_dir', 'wave_dir', 'current_dir', 'flow_dir', 'pitch', 'roll'
