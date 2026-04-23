@@ -1,5 +1,14 @@
 """Shared utilities for UOP data-processing workflows."""
 
+from .coare import (
+    add_scalar_input_variable,
+    annotate_reference_height_outputs,
+    load_processing_config,
+    process_radiation,
+    process_surface_current,
+    resample_dataset,
+    write_coare_scalar_latex_table,
+)
 from .geo import (
     calculate_angle_between_vectors,
     calculate_wind_stress_components,
@@ -29,6 +38,8 @@ from .qc import remove_spikes
 
 __all__ = [
     'add_metadata_comments',
+    'add_scalar_input_variable',
+    'annotate_reference_height_outputs',
     'build_gap_aware_series',
     'calculate_angle_between_vectors',
     'calculate_wind_stress_components',
@@ -46,9 +57,14 @@ __all__ = [
     'get_uop_coare_details',
     'get_uop_coare_version',
     'is_directional_variable',
+    'load_processing_config',
+    'process_radiation',
+    'process_surface_current',
     'remove_spikes',
+    'resample_dataset',
     'update_encoding',
     'validate_time_range',
+    'write_coare_scalar_latex_table',
     'write_git_provenance',
 ]
 

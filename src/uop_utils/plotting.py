@@ -8,19 +8,19 @@ import numpy as np
 from math import ceil
 
 
-def create_custom_figure_latex(image_path, caption, label, placement='!htbp', width='0.96\textwidth'):
+def create_custom_figure_latex(image_path, caption, label, placement='!htbp', width='0.96\\textwidth'):
     """Create LaTeX content for a figure using a fully qualified image path."""
     return (
-        f"\begin{{figure}}[{placement}]\n"
-        f"    \centering\n"
-        f"    \includegraphics[width={width}]{{{image_path}}}\n"
-        f"    \caption{{{caption}}}\n"
-        f"    \label{{{label}}}\n"
-        f"\end{{figure}}\n\n"
+        f"\\begin{{figure}}[{placement}]\n"
+        f"    \\centering\n"
+        f"    \\includegraphics[width={width}]{{{image_path}}}\n"
+        f"    \\caption{{{caption}}}\n"
+        f"    \\label{{{label}}}\n"
+        f"\\end{{figure}}\n\n"
     )
 
 
-def create_figure_latex(base_image_dir, filename, group_name, freq='5-min', placement='!htbp', width='0.96\textwidth'):
+def create_figure_latex(base_image_dir, filename, group_name, freq='5-min', placement='!htbp', width='0.96\\textwidth'):
     """Create LaTeX content for a figure."""
     caption_text = filename.replace('.png', '').replace('_', ' ')
     print(caption_text)
@@ -33,18 +33,18 @@ def create_figure_latex(base_image_dir, filename, group_name, freq='5-min', plac
     )
 
 
-def create_two_figure_page_latex(base_image_dir, items, group_name, freq='5-min', placement='H', width='0.76\textwidth'):
+def create_two_figure_page_latex(base_image_dir, items, group_name, freq='5-min', placement='H', width='0.76\\textwidth'):
     """Create one LaTeX float containing up to two stacked figures."""
-    lines = [f"\begin{{figure}}[{placement}]\n", "    \centering\n"]
+    lines = [f"\\begin{{figure}}[{placement}]\n", "    \centering\n"]
     for index, filename in enumerate(items):
         caption_text = filename.replace('.png', '').replace('_', ' ')
         print(caption_text)
-        lines.append(f"    \includegraphics[width={width}]{{{base_image_dir}/{group_name}/{filename}}}\n")
-        lines.append(f"    \caption{{Comparison of original and {freq} averaged data for {caption_text}.}}\n")
-        lines.append(f"    \label{{fig:{filename.replace('.png', '')}}}\n")
+        lines.append(f"    \\includegraphics[width={width}]{{{base_image_dir}/{group_name}/{filename}}}\n")
+        lines.append(f"    \\caption{{Comparison of original and {freq} averaged data for {caption_text}.}}\n")
+        lines.append(f"    \\label{{fig:{filename.replace('.png', '')}}}\n")
         if index != len(items) - 1:
-            lines.append("    \vspace{0.8em}\n")
-    lines.append("\end{figure}\n\n")
+            lines.append("    \\vspace{0.8em}\n")
+    lines.append("\\end{figure}\n\n")
     return ''.join(lines)
 
 
