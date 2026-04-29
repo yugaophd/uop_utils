@@ -44,3 +44,9 @@ def load_config(config_path):
     """Load a JSON configuration file."""
     with open(config_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def write_json(payload, output_path, indent=2):
+    """Write a dictionary payload to a JSON file."""
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=indent)

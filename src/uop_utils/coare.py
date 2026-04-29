@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from .geo import compute_current_relative_wind
+
 
 def load_processing_config(config_path, section=None):
     """Load a JSON processing configuration, optionally returning one section."""
@@ -24,6 +26,74 @@ def add_scalar_input_variable(ds_output, name, value, attrs):
     if data.dtype.kind in {"U", "S", "O"}:
         data = np.asarray(str(value), dtype=str)
     ds_output[name] = xr.DataArray(data, attrs=attrs)
+
+
+def ensure_1d(arr, length):
+    """Return an array as a one-dimensional series with the requested length."""
+    values = np.asarray(arr)
+    if values.ndim == 0:
+        return np.full(length, float(values))
+    if values.ndim == 1:
+        if values.shape[0] == length:
+            return values
+        if values.shape[0] > length:
+            return values[:length]
+        return np.concatenate([values, np.full(length - values.shape[0], np.nan)])
+
+    axes = [i for i, dim in enumerate(values.shape) if dim == length]
+    if axes:
+        values = np.moveaxis(values, axes[0], 0)
+        if values.ndim > 1:
+            values = np.nanmean(values, axis=tuple(range(1, values.ndim)))
+        return values
+
+    values = values.reshape(-1)
+    if values.shape[0] > length:
+        return values[:length]
+    return np.concatenate([values, np.full(length - values.shape[0], np.nan)])
+
+
+def to_scalar(arr):
+    """Return a numeric scalar from an array-like value, preferring nanmean."""
+    try:
+        return float(np.nanmean(np.asarray(arr, dtype=float)))
+    except Exception:
+        return float(np.asarray(arr).reshape(-1)[0])
+
+
+def pick_instrument_height(ds, prefix, attribute_keys=None):
+    """Return the first finite instrument height found for variables with a prefix."""
+    if attribute_keys is None:
+        attribute_keys = (
+            "height_above_waterline_m",
+            "height_m",
+            "height_aboveWaterline",
+        )
+
+    for name in ds.data_vars:
+        if not name.startswith(prefix):
+            continue
+        for key in attribute_keys:
+            candidate = ds[name].attrs.get(key)
+            if candidate is not None and np.isfinite(float(candidate)):
+                return float(candidate)
+        raise RuntimeError(
+            f"Instrument height unavailable for {name}. "
+            f"Expected one of attributes: {list(attribute_keys)}."
+        )
+
+    raise RuntimeError(
+        f"Instrument variable with prefix '{prefix}' not found. "
+        "Cannot continue without instrument height."
+    )
+
+
+def instrument_prefix_for_var(var_name, variable_to_instrument_prefix):
+    """Return the instrument metadata prefix mapped to an L3 variable name."""
+    for variable_prefix, instrument_prefix in variable_to_instrument_prefix.items():
+        if var_name.lower().startswith(variable_prefix.lower() + "_"):
+            return instrument_prefix
+    return None
 
 
 def annotate_reference_height_outputs(ds_output, zrf_u, zrf_t, zrf_q):
@@ -83,24 +153,58 @@ def process_surface_current(ds, depth=4, max_gap_hours=2):
     """Interpolate surface current at the requested depth for COARE processing."""
     print(f"Processing surface current at {depth}m depth (20-min averages)")
 
-    if "Workhorse_vel_east" not in ds or "Workhorse_vel_north" not in ds:
+    current_configs = [
+        {
+            "u_var": "Nortek_vel_east",
+            "v_var": "Nortek_vel_north",
+            "label": "Nortek",
+        },
+        {
+            "u_var": "Workhorse_vel_east",
+            "v_var": "Workhorse_vel_north",
+            "label": "Workhorse",
+        },
+    ]
+
+    selected = None
+    for config in current_configs:
+        if config["u_var"] in ds and config["v_var"] in ds:
+            selected = config
+            break
+
+    if selected is None:
         print("Surface current data not available")
         return None, None, None
 
-    vel_x = ds.Workhorse_vel_east
-    vel_y = ds.Workhorse_vel_north
+    vel_x = ds[selected["u_var"]]
+    vel_y = ds[selected["v_var"]]
 
-    if "Workhorse_bin_depth" not in ds.Workhorse_vel_east.coords:
+    range_dim = next((dim for dim in vel_x.dims if dim != "time"), None)
+    if range_dim is None:
+        print("Could not determine current range dimension")
+        return None, None, None
+
+    depth_candidates = [range_dim, f"{range_dim}_depth"]
+    depth_coord_name = next((name for name in depth_candidates if name in vel_x.coords or name in ds.coords), None)
+    if depth_coord_name is None:
         print("Depth information not available in current data")
         return None, None, None
 
-    depth_data = ds.Workhorse_vel_east.Workhorse_bin_depth.data
+    if depth_coord_name in vel_x.coords:
+        depth_data = vel_x.coords[depth_coord_name].data
+    else:
+        depth_data = ds.coords[depth_coord_name].data
+
+    if np.all(depth_data <= 0):
+        depth_data = np.abs(depth_data)
+        print(f"Converting negative {selected['label']} depths to positive")
+
     depth_idx = np.argmin(np.abs(depth_data - depth))
     actual_depth = depth_data[depth_idx]
-    print(f"Using depth {actual_depth}m (index: {depth_idx})")
+    print(f"Using {selected['label']} depth {actual_depth}m (index: {depth_idx})")
 
-    u_vel = vel_x.isel(Workhorse_range=depth_idx)
-    v_vel = vel_y.isel(Workhorse_range=depth_idx)
+    u_vel = vel_x.isel({range_dim: depth_idx})
+    v_vel = vel_y.isel({range_dim: depth_idx})
     valid_mask = ~np.isnan(u_vel) & ~np.isnan(v_vel)
 
     if np.sum(valid_mask) < 3:
@@ -122,6 +226,23 @@ def process_surface_current(ds, depth=4, max_gap_hours=2):
     print(f"Interpolated {v_interp_count} points in V velocity (20-min)")
 
     return df_interpolated["u"].values, df_interpolated["v"].values, time_vals
+
+
+def apply_current_relative_wind(wind_speed, wind_direction, current_east, current_north, min_valid_points=10):
+    """Adjust wind speed and direction relative to surface current when enough current data exists."""
+    valid_current = np.isfinite(current_east) & np.isfinite(current_north)
+    if np.sum(valid_current) <= min_valid_points:
+        print("Insufficient valid current data for relative wind calculation")
+        return wind_speed, wind_direction, valid_current, False
+
+    rel_wind_speed, rel_wind_direction, valid_current = compute_current_relative_wind(
+        wind_speed,
+        wind_direction,
+        current_east,
+        current_north,
+    )
+    print(f"Using wind relative to surface current ({np.sum(valid_current)} valid points)")
+    return rel_wind_speed, rel_wind_direction, valid_current, True
 
 
 def process_radiation(datasets, freq="20min"):

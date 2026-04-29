@@ -49,6 +49,11 @@ def compute_current_relative_wind(wind_speed, wind_direction_deg, current_east, 
     return rel_speed, rel_direction, valid_current
 
 
+def vector_to_met_direction(u_component, v_component):
+    """Convert vector components to meteorological direction (degrees from which flow comes)."""
+    return (np.degrees(np.arctan2(-u_component, -v_component)) + 360.0) % 360.0
+
+
 def circular_mean_resample(da, time_dim, freq='5min'):
     """Resample directional data using circular averaging."""
     rad_data = np.deg2rad(da)

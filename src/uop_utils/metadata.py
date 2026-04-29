@@ -9,6 +9,7 @@ from importlib import metadata as importlib_metadata
 from typing import Optional
 
 import numpy as np
+import xarray as xr
 
 
 def get_uop_coare_details():
@@ -213,3 +214,115 @@ def fix_waveglider_issues(ds, waveglider_name):
                     ds[var_name].attrs['instrument'] = 'INST_RBR_Concerto_WHOI'
                     print(f'Fixed instrument reference for {var_name}')
     return ds
+
+
+def fix_L2_metadata(ds, campaign_name):
+    """Normalize L2 metadata for ASTraL waveglider outputs."""
+    attrs = ds.attrs.copy()
+
+    smode_attrs_to_remove = [
+        'DOI',
+        'id',
+        'metadata_link',
+        'acknowledgement',
+        'program',
+        'publisher_name',
+        'publisher_email',
+        'publisher_url',
+        'publisher_type',
+        'publisher_institution',
+        'contributor_name',
+        'contributor_role',
+    ]
+
+    for attr in smode_attrs_to_remove:
+        if attr in attrs:
+            del attrs[attr]
+
+    attrs['project'] = 'Air-Sea Transfer in Rapid Atmosphere-Land transitions (ASTraL)'
+    attrs['title'] = f'ASTraL 2024 Waveglider Observations, {campaign_name}, Bay of Bengal 2024'
+
+    if 'summary' in attrs:
+        attrs['summary'] = (
+            f'Wave Glider {campaign_name} was deployed as part of the ASTraL (Air-Sea Transfer '
+            f'in Rapid Atmosphere-Land transitions) Field Campaign in the Bay of Bengal during 2024. '
+            f'This wave glider is equipped with oceanographic and meteorological instruments including '
+            f'ADCP, GPS/IMU, GPCTD, Vaisala WXT536 weather station, shortwave and longwave radiometers, '
+            f'and temperature/humidity probes for air-sea interaction studies.'
+        )
+
+    attrs['institution'] = 'Woods Hole Oceanographic Institution (WHOI) and Scripps Institution of Oceanography (SIO)'
+    attrs['creator_institution'] = 'WHOI and SIO'
+    attrs['sea_name'] = 'Indian Ocean'
+    attrs['license'] = 'Data is freely available under Creative Commons CC BY 4.0'
+    attrs['processing_level'] = 'L2'
+    attrs['creator_name'] = 'Tom Farrar and Yu Gao'
+    attrs['creator_email'] = 'jfarrar@whoi.edu, yu.gao@whoi.edu'
+    attrs['comment'] = f'ASTraL project L2 data for {campaign_name} wave glider processed and converted to NetCDF.'
+
+
+def write_git_provenance(git_attrs, output_path):
+    """Write git provenance information as a LaTeX verbatim block for inclusion in data reports.
+
+    Parameters
+    ----------
+    git_attrs : dict
+        Dictionary returned by get_git_governance_info().
+    output_path : str
+        File path for the output .tex file.
+    """
+    lines = []
+    lines.append('\\subsection*{Git Provenance}')
+    lines.append('\\begin{tabular}{ll}')
+    lines.append('\\hline')
+    lines.append('\\textbf{Field} & \\textbf{Value} \\\\')
+    lines.append('\\hline')
+
+    field_labels = [
+        ('git_branch',        'Branch'),
+        ('git_commit_full',   'Commit (full)'),
+        ('git_commit_short',  'Commit (short)'),
+        ('git_is_dirty',      'Working tree dirty'),
+        ('git_script_path',   'Script path'),
+        ('git_tag',           'Tag'),
+    ]
+    for key, label in field_labels:
+        value = git_attrs.get(key)
+        if value is None:
+            continue
+        # Escape LaTeX special characters
+        escaped = str(value).replace('_', '\\_').replace('%', '\\%').replace('&', '\\&').replace('#', '\\#')
+        lines.append(f'{label} & \\texttt{{{escaped}}} \\\\')
+
+    lines.append('\\hline')
+    lines.append('\\end{tabular}')
+    lines.append('')
+
+    with open(output_path, 'w', encoding='utf-8') as fh:
+        fh.write('\n'.join(lines) + '\n')
+
+    print(f'Git provenance LaTeX written: {output_path}')
+
+
+def append_history(existing_history, new_message):
+    """Append a message to a CF-style history string."""
+    if existing_history:
+        return existing_history + ' ' + new_message
+    return new_message
+
+
+def build_data_array(values, time_values, lat, lon, attrs):
+    """Build a time-indexed xarray DataArray with lat/lon as time-dependent coordinates."""
+    clean_attrs = {key: value for key, value in attrs.items() if value not in (None, '')}
+    return xr.DataArray(
+        values,
+        dims=['time'],
+        coords={
+            'time': time_values,
+            'lat': ('time', lat),
+            'lon': ('time', lon),
+        },
+        attrs=clean_attrs,
+    )
+
+    return attrs

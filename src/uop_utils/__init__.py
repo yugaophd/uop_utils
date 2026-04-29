@@ -2,11 +2,16 @@
 
 from .coare import (
     add_scalar_input_variable,
+    apply_current_relative_wind,
     annotate_reference_height_outputs,
+    ensure_1d,
+    instrument_prefix_for_var,
     load_processing_config,
+    pick_instrument_height,
     process_radiation,
     process_surface_current,
     resample_dataset,
+    to_scalar,
     write_coare_scalar_latex_table,
 )
 from .geo import (
@@ -15,11 +20,15 @@ from .geo import (
     circular_mean_resample,
     compute_current_relative_wind,
     is_directional_variable,
+    vector_to_met_direction,
 )
-from .io import create_dir, load_config, update_encoding
+from .io import create_dir, load_config, update_encoding, write_json
 from .metadata import (
     add_metadata_comments,
+    append_history,
+    build_data_array,
     fix_waveglider_issues,
+    fix_L2_metadata,
     get_git_governance_info,
     get_uop_coare_details,
     get_uop_coare_version,
@@ -32,15 +41,18 @@ from .plotting import (
     create_custom_figure_latex,
     create_figure_latex,
     create_two_figure_page_latex,
+    format_compact_date_labels,
     plot_coare_input_multipanel,
 )
-from .qc import remove_spikes
+from .qc import apply_nortek_qc_flags, apply_qc_flags, apply_workhorse_qc_flags, remove_spikes
 
 __all__ = [
     'add_metadata_comments',
     'add_scalar_input_variable',
+    'apply_current_relative_wind',
     'annotate_reference_height_outputs',
     'build_gap_aware_series',
+    'build_data_array',
     'calculate_angle_between_vectors',
     'calculate_wind_stress_components',
     'circular_mean_resample',
@@ -50,22 +62,34 @@ __all__ = [
     'load_config',
     'create_figure_latex',
     'create_two_figure_page_latex',
+    'ensure_1d',
     'extract_campaign_names',
+    'fix_L2_metadata',
+    'format_compact_date_labels',
     'plot_coare_input_multipanel',
+    'append_history',
     'fix_waveglider_issues',
     'get_git_governance_info',
     'get_uop_coare_details',
     'get_uop_coare_version',
+    'instrument_prefix_for_var',
     'is_directional_variable',
     'load_processing_config',
+    'pick_instrument_height',
     'process_radiation',
     'process_surface_current',
+    'apply_nortek_qc_flags',
+    'apply_qc_flags',
+    'apply_workhorse_qc_flags',
     'remove_spikes',
     'resample_dataset',
+    'to_scalar',
     'update_encoding',
     'validate_time_range',
+    'vector_to_met_direction',
     'write_coare_scalar_latex_table',
+    'write_json',
     'write_git_provenance',
 ]
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'

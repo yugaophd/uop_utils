@@ -86,14 +86,61 @@ def build_gap_aware_series(time_values, data_values, gap_factor=1.5):
     return np.asarray(gap_times), np.asarray(gap_values)
 
 
-def plot_coare_input_multipanel(input_series, output_path):
-    """Create one multipanel plot with all Wave Glider input time series."""
+def format_compact_date_labels(fig, axes):
+    """Show the year on the first visible tick and month-day on later ticks."""
+    axes = np.atleast_1d(axes).flatten()
+    locator = mdates.AutoDateLocator(minticks=3, maxticks=6)
+
+    for ax in axes:
+        if ax.get_visible():
+            ax.xaxis.set_major_locator(locator)
+
+    fig.canvas.draw()
+
+    for ax in axes:
+        if not ax.get_visible():
+            continue
+
+        tick_positions = ax.get_xticks()
+        x_min, x_max = ax.get_xlim()
+        visible_ticks = [tick for tick in tick_positions if x_min <= tick <= x_max]
+        if not visible_ticks:
+            continue
+
+        first_visible_tick = visible_ticks[0]
+        labels = []
+        for tick in tick_positions:
+            if not (x_min <= tick <= x_max):
+                labels.append('')
+                continue
+            tick_dt = mdates.num2date(tick)
+            labels.append(tick_dt.strftime('%Y-%m-%d' if tick == first_visible_tick else '%m-%d'))
+
+        ax.set_xticks(tick_positions)
+        ax.set_xticklabels(labels)
+
+
+def plot_coare_input_multipanel(input_series, output_path, variables=None):
+    """Create one multipanel plot with all Wave Glider input time series.
+    
+    Parameters
+    ----------
+    input_series : list of dict
+        List of dictionaries containing time series data for each platform.
+    output_path : str
+        File path where the figure will be saved.
+    variables : list of str, optional
+        List of variable names to plot. If None, uses default list.
+        Default: ['u', 't', 'rh', 'P', 'ts', 'rain', 'Ss', 'lat', 'lon']
+    """
     if not input_series:
         print("No COARE input time series available for plotting.")
         return
 
-    variables = ['u', 't', 'rh', 'P', 'ts', 'rain', 'Ss', 'lat', 'lon']
-    ylabels = {
+    if variables is None:
+        variables = ['u', 't', 'rh', 'P', 'ts', 'rain', 'Ss', 'lat', 'lon']
+    
+    all_ylabels = {
         'u': 'Wind speed (m s$^{-1}$)',
         't': 'Air temperature (degC)',
         'rh': 'Relative humidity (%)',
@@ -101,10 +148,12 @@ def plot_coare_input_multipanel(input_series, output_path):
         'ts': 'Sea temperature (degC)',
         'rain': 'Rain rate',
         'Ss': 'Salinity (PSU)',
+        'sw_dn': 'Shortwave radiation (W m$^{-2}$)',
+        'lw_dn': 'Longwave radiation (W m$^{-2}$)',
         'lat': 'Latitude (deg)',
         'lon': 'Longitude (deg)',
     }
-    titles = {
+    all_titles = {
         'u': 'Wind speed',
         't': 'Air temperature',
         'rh': 'Relative humidity',
@@ -112,9 +161,14 @@ def plot_coare_input_multipanel(input_series, output_path):
         'ts': 'Sea temperature',
         'rain': 'Rain rate',
         'Ss': 'Salinity',
+        'sw_dn': 'Shortwave radiation',
+        'lw_dn': 'Longwave radiation',
         'lat': 'Latitude',
         'lon': 'Longitude',
     }
+    
+    ylabels = {k: all_ylabels.get(k, k) for k in variables}
+    titles = {k: all_titles.get(k, k) for k in variables}
 
     ncols = 2
     nrows = ceil(len(variables) / ncols)
@@ -160,7 +214,8 @@ def plot_coare_input_multipanel(input_series, output_path):
     for j in range(len(variables), len(axes)):
         axes[j].set_visible(False)
 
-    legend_panel_var = 'lat'
+    # Place legend on last panel or 'lat' if available
+    legend_panel_var = 'lat' if 'lat' in variables else variables[-1]
     legend_idx = variables.index(legend_panel_var)
     legend_ax = axes[legend_idx]
     handles, labels = legend_ax.get_legend_handles_labels()

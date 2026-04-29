@@ -44,3 +44,54 @@ def remove_spikes(data, time, window_size=12, threshold=3.0):
             cleaned_data[i] = np.nan
 
     return cleaned_data
+
+
+def apply_workhorse_qc_flags(ds, var, var_name):
+    """Apply Workhorse QC flags to a variable before averaging."""
+    return apply_qc_flags(ds, var, var_name, flag_name='Workhorse_flag')
+
+
+def apply_nortek_qc_flags(ds, var, var_name):
+    """Apply Nortek QC flags to a variable before averaging."""
+    print(f"[apply_nortek_qc_flags] Using flag: 'Nortek_flag' for variable: {var_name}")
+    return apply_qc_flags(ds, var, var_name, flag_name='Nortek_flag')
+
+
+def apply_qc_flags(ds, var, var_name, flag_name='Workhorse_flag'):
+    """Apply a binary QC flag variable to a data variable before averaging."""
+    if flag_name not in ds:
+        print(f'No {flag_name} found in dataset for {var_name}')
+        return var
+
+    qc_flag = ds[flag_name]
+    print(f'    Applying {flag_name} to {var_name}...')
+
+    flag_binary = (qc_flag > 0).astype(int)
+
+    if qc_flag.dims == var.dims:
+        var_qc = var.where(flag_binary == 0, np.nan)
+    elif len(var.dims) == 1 and var.dims[0] in qc_flag.dims and 'bin_depth' in str(qc_flag.dims):
+        print(f'    Using surface-level flags for surface variable {var_name}')
+        if 'bin_depth' in qc_flag.dims:
+            surface_dim = next(dim for dim in qc_flag.dims if 'bin_depth' in dim)
+            surface_flag = flag_binary.isel({surface_dim: 0})
+            var_qc = var.where(surface_flag == 0, np.nan)
+        else:
+            var_qc = var
+    else:
+        print(f'    Warning: Dimension mismatch between {flag_name} and {var_name}.')
+        print(f'    Flag dims: {qc_flag.dims}, Variable dims: {var.dims}')
+        print('    Skipping QC for this variable.')
+        return var
+
+    original_nan_count = np.sum(np.isnan(var.values))
+    flagged_nan_count = np.sum(np.isnan(var_qc.values))
+    newly_flagged = flagged_nan_count - original_nan_count
+    total_points = var.size
+
+    print(f'    Applied {flag_name} to {var_name}:')
+    print(f'      Original NaN count: {original_nan_count} ({original_nan_count / total_points * 100:.1f}%)')
+    print(f'      After flagging: {flagged_nan_count} ({flagged_nan_count / total_points * 100:.1f}%)')
+    print(f'      Newly flagged: {newly_flagged} ({newly_flagged / total_points * 100:.1f}%)')
+
+    return var_qc
