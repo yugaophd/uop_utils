@@ -27,9 +27,10 @@ from .metadata import (
     add_metadata_comments,
     append_history,
     build_data_array,
+    compute_practical_salinity_from_conductivity,
     fix_waveglider_issues,
     fix_L2_metadata,
-    get_git_governance_info,
+    get_git_provenance_info,
     get_uop_coare_details,
     get_uop_coare_version,
     validate_time_range,
@@ -54,6 +55,7 @@ __all__ = [
     'build_gap_aware_series',
     'build_data_array',
     'calculate_angle_between_vectors',
+    'compute_practical_salinity_from_conductivity',
     'calculate_wind_stress_components',
     'circular_mean_resample',
     'compute_current_relative_wind',
@@ -69,7 +71,7 @@ __all__ = [
     'plot_coare_input_multipanel',
     'append_history',
     'fix_waveglider_issues',
-    'get_git_governance_info',
+    'get_git_provenance_info',
     'get_uop_coare_details',
     'get_uop_coare_version',
     'instrument_prefix_for_var',
@@ -92,4 +94,4 @@ __all__ = [
     'write_git_provenance',
 ]
 
-__version__ = '0.1.1'
+__version__ = '1.0.0'

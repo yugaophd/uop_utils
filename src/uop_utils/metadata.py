@@ -48,8 +48,66 @@ def get_uop_coare_version():
     return get_uop_coare_details()['version']
 
 
-def get_git_governance_info(repo_path: Optional[str] = None, script_path: Optional[str] = None, status_limit: int = 20) -> dict:
-    """Collect git provenance metadata for processing-governance records."""
+def compute_practical_salinity_from_conductivity(
+    conductivity,
+    temperature,
+    depth_m,
+    latitude,
+    conductivity_units: str = 'S m-1',
+):
+    """Compute practical salinity and pressure from conductivity using TEOS-10.
+
+    Parameters
+    ----------
+    conductivity : array-like
+        Conductivity values.
+    temperature : array-like
+        In-situ temperature in degrees C.
+    depth_m : array-like
+        Depth in meters (positive down).
+    latitude : array-like
+        Latitude in degrees north.
+    conductivity_units : str, optional
+        Conductivity units. Supported values are S m-1 (or equivalent) and mS/cm.
+
+    Returns
+    -------
+    salinity_psu : np.ndarray
+        Practical salinity (unitless, often reported as PSU).
+    pressure_dbar : np.ndarray
+        Sea pressure in dbar computed from depth and latitude.
+    conductivity_mscm : np.ndarray
+        Conductivity converted to mS/cm used for salinity calculation.
+    """
+    try:
+        import gsw
+    except ImportError as e:
+        raise ImportError('gsw is required for conductivity-to-salinity conversion.') from e
+
+    conductivity_arr = np.asarray(conductivity, dtype=float)
+    temperature_arr = np.asarray(temperature, dtype=float)
+    depth_arr = np.asarray(depth_m, dtype=float)
+    latitude_arr = np.asarray(latitude, dtype=float)
+    units_norm = str(conductivity_units or '').strip().lower()
+
+    if units_norm in {'s m-1', 's/m', 'siemens/m', 'siemens per meter'}:
+        conductivity_mscm = conductivity_arr * 10.0
+    elif units_norm in {'ms cm-1', 'ms/cm'}:
+        conductivity_mscm = conductivity_arr
+    else:
+        raise ValueError(
+            f'Unsupported conductivity units: "{conductivity_units}". '
+            'Expected S m-1 (or equivalent) or mS/cm.'
+        )
+
+    pressure_dbar = gsw.p_from_z(-np.abs(depth_arr), latitude_arr)
+    salinity_psu = gsw.SP_from_C(conductivity_mscm, temperature_arr, pressure_dbar)
+
+    return salinity_psu, pressure_dbar, conductivity_mscm
+
+
+def get_git_provenance_info(repo_path: Optional[str] = None, script_path: Optional[str] = None, status_limit: int = 20) -> dict:
+    """Collect git provenance metadata for processing records."""
     repo_path = os.path.abspath(repo_path or os.getcwd())
     info = {
         'git_metadata_available': 0,
@@ -267,7 +325,7 @@ def write_git_provenance(git_attrs, output_path):
     Parameters
     ----------
     git_attrs : dict
-        Dictionary returned by get_git_governance_info().
+        Dictionary returned by get_git_provenance_info().
     output_path : str
         File path for the output .tex file.
     """
