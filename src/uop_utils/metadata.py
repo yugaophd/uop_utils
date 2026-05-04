@@ -348,7 +348,10 @@ def fix_L2_metadata(ds, campaign_name):
 
 
 def write_git_provenance(git_attrs, output_path):
-    """Write git provenance information as a LaTeX verbatim block for inclusion in data reports.
+    """Write git and library provenance information as LaTeX for inclusion in data reports.
+
+    Writes three tables: processing-repo git provenance, uop-coare package
+    details, and uop-utils package details.
 
     Parameters
     ----------
@@ -357,14 +360,27 @@ def write_git_provenance(git_attrs, output_path):
     output_path : str
         File path for the output .tex file.
     """
-    lines = []
-    lines.append('\\subsection*{Git Provenance}')
-    lines.append('\\begin{tabular}{ll}')
-    lines.append('\\hline')
-    lines.append('\\textbf{Field} & \\textbf{Value} \\\\')
-    lines.append('\\hline')
+    def escape(s):
+        return str(s).replace('_', '\\_').replace('%', '\\%').replace('&', '\\&').replace('#', '\\#')
 
-    field_labels = [
+    def make_table(title, rows):
+        """rows is a list of (label, value) tuples."""
+        block = [
+            f'\\subsection*{{{title}}}',
+            '\\begin{tabular}{ll}',
+            '\\hline',
+            '\\textbf{Field} & \\textbf{Value} \\\\',
+            '\\hline',
+        ]
+        for label, value in rows:
+            block.append(f'{label} & \\texttt{{{escape(value)}}} \\\\')
+        block.append('\\hline')
+        block.append('\\end{tabular}')
+        block.append('')
+        return block
+
+    # --- Processing repo git provenance ---
+    git_field_labels = [
         ('git_branch',        'Branch'),
         ('git_commit_full',   'Commit (full)'),
         ('git_commit_short',  'Commit (short)'),
@@ -372,17 +388,28 @@ def write_git_provenance(git_attrs, output_path):
         ('git_script_path',   'Script path'),
         ('git_tag',           'Tag'),
     ]
-    for key, label in field_labels:
-        value = git_attrs.get(key)
-        if value is None:
-            continue
-        # Escape LaTeX special characters
-        escaped = str(value).replace('_', '\\_').replace('%', '\\%').replace('&', '\\&').replace('#', '\\#')
-        lines.append(f'{label} & \\texttt{{{escaped}}} \\\\')
+    git_rows = [(label, git_attrs[key]) for key, label in git_field_labels if git_attrs.get(key) is not None]
+    lines = make_table('Git Provenance', git_rows)
 
-    lines.append('\\hline')
-    lines.append('\\end{tabular}')
-    lines.append('')
+    # --- uop-coare library ---
+    uop_coare_d = get_uop_coare_details()
+    coare_rows = [
+        ('Package', uop_coare_d.get('dist_name') or 'uop-coare'),
+        ('Version', uop_coare_d.get('version') or 'unknown'),
+        ('Install path', uop_coare_d.get('dist_path') or 'unknown'),
+        ('Module path', uop_coare_d.get('module_path') or 'unknown'),
+    ]
+    lines += make_table('uop-coare', coare_rows)
+
+    # --- uop-utils library ---
+    uop_utils_d = get_uop_utils_details()
+    utils_rows = [
+        ('Package', uop_utils_d.get('dist_name') or 'uop-utils'),
+        ('Version', uop_utils_d.get('version') or 'unknown'),
+        ('Install path', uop_utils_d.get('dist_path') or 'unknown'),
+        ('Module path', uop_utils_d.get('module_path') or 'unknown'),
+    ]
+    lines += make_table('uop-utils', utils_rows)
 
     with open(output_path, 'w', encoding='utf-8') as fh:
         fh.write('\n'.join(lines) + '\n')

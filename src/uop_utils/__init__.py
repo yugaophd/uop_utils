@@ -96,4 +96,4 @@ __all__ = [
     'write_git_provenance',
 ]
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
