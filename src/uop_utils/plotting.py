@@ -138,10 +138,11 @@ def plot_coare_input_multipanel(input_series, output_path, variables=None):
         return
 
     if variables is None:
-        variables = ['u', 't', 'rh', 'P', 'ts', 'rain', 'Ss', 'lat', 'lon']
+        variables = ['u', 'wind_direction', 't', 'rh', 'P', 'ts', 'rain', 'Ss', 'lat', 'lon']
     
     all_ylabels = {
         'u': 'Wind speed (m s$^{-1}$)',
+        'wind_direction': 'Wind direction (deg)',
         't': 'Air temperature (degC)',
         'rh': 'Relative humidity (%)',
         'P': 'Pressure (hPa)',
@@ -155,6 +156,7 @@ def plot_coare_input_multipanel(input_series, output_path, variables=None):
     }
     all_titles = {
         'u': 'Wind speed',
+        'wind_direction': 'Wind direction',
         't': 'Air temperature',
         'rh': 'Relative humidity',
         'P': 'Pressure',
@@ -235,17 +237,15 @@ def plot_coare_input_multipanel(input_series, output_path, variables=None):
     for j in range(len(variables), len(axes)):
         axes[j].set_visible(False)
 
-    # Place legend on last panel or 'lat' if available
-    legend_panel_var = 'lat' if 'lat' in variables else variables[-1]
-    legend_idx = variables.index(legend_panel_var)
-    legend_ax = axes[legend_idx]
+    # Place legend on the first panel at the best location
+    legend_ax = axes[0]
     handles, labels = legend_ax.get_legend_handles_labels()
     if handles:
         nlegend_cols = 1 if len(labels) <= 4 else 2
         legend_ax.legend(
             handles,
             labels,
-            loc='upper right',
+            loc='best',
             fontsize=7,
             frameon=True,
             ncol=nlegend_cols,
