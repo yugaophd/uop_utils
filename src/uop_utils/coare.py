@@ -320,8 +320,20 @@ def resample_dataset(ds, freq="20min"):
     return ds_resampled
 
 
-def write_coare_scalar_latex_table(scalar_rows, output_path):
-    """Write per-platform scalar COARE inputs as a LaTeX table."""
+def write_coare_scalar_latex_table(scalar_rows, output_path, extra_provenance=None):
+    """Write per-platform scalar COARE inputs as a LaTeX table.
+
+    Parameters
+    ----------
+    scalar_rows : list of dict
+        One dict per platform, as built by ``add_scalar_input_variable``.
+    output_path : str or Path
+        Destination ``.tex`` file.
+    extra_provenance : dict, optional
+        If provided, append a provenance block after the table.  Expects keys
+        ``dist_name``, ``version``, and ``module_path`` as returned by
+        ``get_uop_utils_details()`` or ``get_uop_coare_details()``.
+    """
     if not scalar_rows:
         print("No scalar COARE inputs available for LaTeX table.")
         return
@@ -347,6 +359,18 @@ def write_coare_scalar_latex_table(scalar_rows, output_path):
         )
 
     lines.append("\\hline\n\\end{tabular}\n\\end{table}\n")
+
+    if extra_provenance:
+        dist_name = str(extra_provenance.get('dist_name', 'uop-utils'))
+        version = str(extra_provenance.get('version', 'unknown'))
+        module_path = str(extra_provenance.get('module_path', 'unknown'))
+        safe_dist = dist_name.replace('_', '\\_').replace('-', '-')
+        lines.append('\n% Processing library provenance\n')
+        lines.append('\\begin{flushleft}\\footnotesize\n')
+        lines.append(f'{safe_dist} version: \\texttt{{{version}}}\\\\\n')
+        lines.append(f'{safe_dist} path: \\texttt{{\\detokenize{{{module_path}}}}}\\\\\n')
+        lines.append('\\end{flushleft}\n')
+
     with open(output_path, "w", encoding="utf-8") as f:
         f.writelines(lines)
     print(f"Saved COARE scalar-input LaTeX table: {output_path}")

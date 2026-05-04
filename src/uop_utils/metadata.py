@@ -48,6 +48,34 @@ def get_uop_coare_version():
     return get_uop_coare_details()['version']
 
 
+def get_uop_utils_details():
+    """Return version and import details for uop-utils. Mirrors get_uop_coare_details()."""
+    details = {
+        'version': None,
+        'dist_name': None,
+        'dist_path': None,
+        'module_path': None,
+        'python_executable': os.sys.executable,
+    }
+    for dist_name in ('uop-utils', 'uop_utils'):
+        try:
+            dist = importlib_metadata.distribution(dist_name)
+            details['version'] = dist.version
+            details['dist_name'] = dist.metadata['Name'] or dist_name
+            details['dist_path'] = str(dist.locate_file(''))
+            break
+        except importlib_metadata.PackageNotFoundError:
+            continue
+    try:
+        import uop_utils
+        details['module_path'] = getattr(uop_utils, '__file__', None)
+        if not details['version']:
+            details['version'] = getattr(uop_utils, '__version__', None)
+    except Exception:
+        pass
+    return details
+
+
 def compute_practical_salinity_from_conductivity(
     conductivity,
     temperature,

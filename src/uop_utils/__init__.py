@@ -33,6 +33,7 @@ from .metadata import (
     get_git_provenance_info,
     get_uop_coare_details,
     get_uop_coare_version,
+    get_uop_utils_details,
     validate_time_range,
     write_git_provenance,
 )
@@ -74,6 +75,7 @@ __all__ = [
     'get_git_provenance_info',
     'get_uop_coare_details',
     'get_uop_coare_version',
+    'get_uop_utils_details',
     'instrument_prefix_for_var',
     'is_directional_variable',
     'load_processing_config',
@@ -94,4 +96,4 @@ __all__ = [
     'write_git_provenance',
 ]
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
