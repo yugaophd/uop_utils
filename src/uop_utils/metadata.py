@@ -180,37 +180,91 @@ def get_git_provenance_info(repo_path: Optional[str] = None, script_path: Option
     return info
 
 
-def write_git_provenance(out_path):
-    """Write a LaTeX snippet with the current git commit info to out_path."""
-    try:
-        commit_meta = subprocess.check_output(['git', 'log', '-1', '--format=%h  %ci'], text=True).strip()
-        commit_subject = subprocess.check_output(['git', 'log', '-1', '--format=%s'], text=True).strip()
-        branch = subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], text=True).strip()
-        remote_url = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], text=True).strip()
-    except subprocess.CalledProcessError:
-        commit_meta, commit_subject, branch, remote_url = 'unavailable', '', 'unavailable', 'unavailable'
+def write_git_provenance(git_attrs_or_path, output_path=None):
+    """Write git and library provenance to a LaTeX file.
 
-    uop_coare_details = get_uop_coare_details()
-    uop_coare_version = uop_coare_details['version']
-    if not uop_coare_version:
-        raise RuntimeError('Unable to determine required uop-coare version. Install/import uop_coare before running processing.')
+    Supports two call styles::
+
+        # 1-arg (S-MODE style) — git info collected internally from CWD
+        write_git_provenance('/path/to/git_provenance.tex')
+
+        # 2-arg — reuse a pre-built dict from get_git_provenance_info()
+        write_git_provenance(git_attrs, '/path/to/git_provenance.tex')
+
+    In both cases the output contains three subsections: the processing-repo
+    git provenance, uop-coare package details, and uop-utils package details.
+
+    Parameters
+    ----------
+    git_attrs_or_path : dict or str
+        When called with two arguments, a dict returned by
+        ``get_git_provenance_info()``.  When called with one argument, the
+        output file path (git info is collected internally from the CWD).
+    output_path : str, optional
+        Destination ``.tex`` file path (only used in the 2-arg form).
+    """
+    if output_path is None:
+        # 1-arg call: git_attrs_or_path is the output path; collect git info now
+        out_path = git_attrs_or_path
+        git_attrs = get_git_provenance_info()
+    else:
+        out_path = output_path
+        git_attrs = git_attrs_or_path
 
     def escape(s):
-        return s.replace('_', r'\_').replace('&', r'\&').replace('%', r'\%').replace('#', r'\#')
+        return str(s).replace('_', '\\_').replace('%', '\\%').replace('&', '\\&').replace('#', '\\#')
 
-    lines = [
-        '\\subsection{Processing Provenance}\n\n',
-        '\\begin{description}\n',
-        f'  \\item[Git Repository] \\url{{{remote_url}}}\n',
-        f'  \\item[Branch] {escape(branch)}\n',
-        f'  \\item[Commit] \\texttt{{{escape(commit_meta)}}}\n',
-        f'  \\item[Message] {escape(commit_subject)}\n',
-        f'  \\item[uop-coare] \\texttt{{{escape(str(uop_coare_version))}}}\n',
-        '\\end{description}\n',
+    def make_table(title, rows):
+        block = [
+            f'\\subsection*{{{title}}}',
+            '\\begin{tabular}{ll}',
+            '\\hline',
+            '\\textbf{Field} & \\textbf{Value} \\\\',
+            '\\hline',
+        ]
+        for label, value in rows:
+            block.append(f'{label} & \\texttt{{{escape(value)}}} \\\\')
+        block.append('\\hline')
+        block.append('\\end{tabular}')
+        block.append('')
+        return block
+
+    # --- Processing repo git provenance ---
+    git_field_labels = [
+        ('git_branch',        'Branch'),
+        ('git_commit_full',   'Commit (full)'),
+        ('git_commit_short',  'Commit (short)'),
+        ('git_is_dirty',      'Working tree dirty'),
+        ('git_script_path',   'Script path'),
+        ('git_tag',           'Tag'),
     ]
-    with open(out_path, 'w') as f:
-        f.writelines(lines)
-    print(f'Wrote git provenance to {out_path}')
+    git_rows = [(label, git_attrs[key]) for key, label in git_field_labels if git_attrs.get(key) is not None]
+    lines = make_table('Git Provenance', git_rows)
+
+    # --- uop-coare library ---
+    uop_coare_d = get_uop_coare_details()
+    coare_rows = [
+        ('Package', uop_coare_d.get('dist_name') or 'uop-coare'),
+        ('Version', uop_coare_d.get('version') or 'unknown'),
+        ('Install path', uop_coare_d.get('dist_path') or 'unknown'),
+        ('Module path', uop_coare_d.get('module_path') or 'unknown'),
+    ]
+    lines += make_table('uop-coare', coare_rows)
+
+    # --- uop-utils library ---
+    uop_utils_d = get_uop_utils_details()
+    utils_rows = [
+        ('Package', uop_utils_d.get('dist_name') or 'uop-utils'),
+        ('Version', uop_utils_d.get('version') or 'unknown'),
+        ('Install path', uop_utils_d.get('dist_path') or 'unknown'),
+        ('Module path', uop_utils_d.get('module_path') or 'unknown'),
+    ]
+    lines += make_table('uop-utils', utils_rows)
+
+    with open(out_path, 'w', encoding='utf-8') as fh:
+        fh.write('\n'.join(lines) + '\n')
+
+    print(f'Git provenance LaTeX written: {out_path}')
 
 
 def validate_time_range(start_date, end_date, time_coverage_start, max_year_difference=1):
@@ -345,76 +399,6 @@ def fix_L2_metadata(ds, campaign_name):
     attrs['creator_name'] = 'Tom Farrar and Yu Gao'
     attrs['creator_email'] = 'jfarrar@whoi.edu, yu.gao@whoi.edu'
     attrs['comment'] = f'ASTraL project L2 data for {campaign_name} wave glider processed and converted to NetCDF.'
-
-
-def write_git_provenance(git_attrs, output_path):
-    """Write git and library provenance information as LaTeX for inclusion in data reports.
-
-    Writes three tables: processing-repo git provenance, uop-coare package
-    details, and uop-utils package details.
-
-    Parameters
-    ----------
-    git_attrs : dict
-        Dictionary returned by get_git_provenance_info().
-    output_path : str
-        File path for the output .tex file.
-    """
-    def escape(s):
-        return str(s).replace('_', '\\_').replace('%', '\\%').replace('&', '\\&').replace('#', '\\#')
-
-    def make_table(title, rows):
-        """rows is a list of (label, value) tuples."""
-        block = [
-            f'\\subsection*{{{title}}}',
-            '\\begin{tabular}{ll}',
-            '\\hline',
-            '\\textbf{Field} & \\textbf{Value} \\\\',
-            '\\hline',
-        ]
-        for label, value in rows:
-            block.append(f'{label} & \\texttt{{{escape(value)}}} \\\\')
-        block.append('\\hline')
-        block.append('\\end{tabular}')
-        block.append('')
-        return block
-
-    # --- Processing repo git provenance ---
-    git_field_labels = [
-        ('git_branch',        'Branch'),
-        ('git_commit_full',   'Commit (full)'),
-        ('git_commit_short',  'Commit (short)'),
-        ('git_is_dirty',      'Working tree dirty'),
-        ('git_script_path',   'Script path'),
-        ('git_tag',           'Tag'),
-    ]
-    git_rows = [(label, git_attrs[key]) for key, label in git_field_labels if git_attrs.get(key) is not None]
-    lines = make_table('Git Provenance', git_rows)
-
-    # --- uop-coare library ---
-    uop_coare_d = get_uop_coare_details()
-    coare_rows = [
-        ('Package', uop_coare_d.get('dist_name') or 'uop-coare'),
-        ('Version', uop_coare_d.get('version') or 'unknown'),
-        ('Install path', uop_coare_d.get('dist_path') or 'unknown'),
-        ('Module path', uop_coare_d.get('module_path') or 'unknown'),
-    ]
-    lines += make_table('uop-coare', coare_rows)
-
-    # --- uop-utils library ---
-    uop_utils_d = get_uop_utils_details()
-    utils_rows = [
-        ('Package', uop_utils_d.get('dist_name') or 'uop-utils'),
-        ('Version', uop_utils_d.get('version') or 'unknown'),
-        ('Install path', uop_utils_d.get('dist_path') or 'unknown'),
-        ('Module path', uop_utils_d.get('module_path') or 'unknown'),
-    ]
-    lines += make_table('uop-utils', utils_rows)
-
-    with open(output_path, 'w', encoding='utf-8') as fh:
-        fh.write('\n'.join(lines) + '\n')
-
-    print(f'Git provenance LaTeX written: {output_path}')
 
 
 def append_history(existing_history, new_message):
