@@ -170,6 +170,28 @@ def plot_coare_input_multipanel(input_series, output_path, variables=None):
     ylabels = {k: all_ylabels.get(k, k) for k in variables}
     titles = {k: all_titles.get(k, k) for k in variables}
 
+    # Compute global time range across all entries and all plotted variables
+    global_t_min = None
+    global_t_max = None
+    for entry in input_series:
+        for var in variables:
+            if var not in entry or len(entry[var]) == 0:
+                continue
+            t = np.asarray(entry['time'])
+            if np.issubdtype(t.dtype, np.datetime64):
+                t_num = mdates.date2num(t.astype('datetime64[ms]').astype(object))
+            else:
+                try:
+                    t_num = t.astype(float)
+                except (TypeError, ValueError):
+                    continue
+            t_min = np.nanmin(t_num)
+            t_max = np.nanmax(t_num)
+            if global_t_min is None or t_min < global_t_min:
+                global_t_min = t_min
+            if global_t_max is None or t_max > global_t_max:
+                global_t_max = t_max
+
     ncols = 2
     nrows = ceil(len(variables) / ncols)
     panel_width = 6.0
@@ -178,11 +200,9 @@ def plot_coare_input_multipanel(input_series, output_path, variables=None):
         nrows,
         ncols,
         figsize=(panel_width * ncols, panel_height * nrows),
-        sharex=True,
+        sharex=False,
     )
     axes = np.array(axes).reshape(-1)
-    date_locator = mdates.AutoDateLocator(minticks=3, maxticks=6)
-    date_formatter = mdates.ConciseDateFormatter(date_locator)
 
     for i, var in enumerate(variables):
         ax = axes[i]
@@ -203,13 +223,14 @@ def plot_coare_input_multipanel(input_series, output_path, variables=None):
         ax.set_title(titles.get(var, var))
         ax.set_ylabel(ylabels.get(var, var))
         ax.grid(True)
+        date_locator = mdates.AutoDateLocator(minticks=3, maxticks=6)
+        date_formatter = mdates.ConciseDateFormatter(date_locator)
         ax.xaxis.set_major_locator(date_locator)
         ax.xaxis.set_major_formatter(date_formatter)
-        ax.tick_params(axis='x', labelrotation=30)
-        if i >= len(variables) - ncols:
-            ax.set_xlabel('Time')
-        else:
-            ax.tick_params(axis='x', labelbottom=False)
+        ax.set_xlabel('Time')
+        ax.tick_params(axis='x', labelbottom=True, labelrotation=30)
+        if global_t_min is not None and global_t_max is not None:
+            ax.set_xlim(global_t_min, global_t_max)
 
     for j in range(len(variables), len(axes)):
         axes[j].set_visible(False)
