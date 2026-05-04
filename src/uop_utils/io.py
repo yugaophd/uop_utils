@@ -11,6 +11,15 @@ def create_dir(directory):
         os.makedirs(directory)
 
 
+def clear_png_files(directory):
+    """Remove all .png files in a directory."""
+    for filename in os.listdir(directory):
+        if filename.endswith('.png'):
+            filepath = os.path.join(directory, filename)
+            os.remove(filepath)
+            print(f'Removed old plot: {filepath}')
+
+
 def update_encoding(ds):
     """Update xarray Dataset encoding for compressed NetCDF output."""
     encoding = {}
