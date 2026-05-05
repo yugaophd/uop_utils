@@ -22,7 +22,14 @@ from .geo import (
     is_directional_variable,
     vector_to_met_direction,
 )
-from .io import clear_png_files, create_dir, load_config, update_encoding, write_json
+from .io import (
+    clear_png_files,
+    copy_inst_variables_to_data_vars,
+    create_dir,
+    load_config,
+    update_encoding,
+    write_json,
+)
 from .metadata import (
     add_metadata_comments,
     append_history,
@@ -57,6 +64,7 @@ __all__ = [
     'build_data_array',
     'calculate_angle_between_vectors',
     'clear_png_files',
+    'copy_inst_variables_to_data_vars',
     'compute_practical_salinity_from_conductivity',
     'calculate_wind_stress_components',
     'circular_mean_resample',
@@ -97,4 +105,4 @@ __all__ = [
     'write_git_provenance',
 ]
 
-__version__ = '1.0.6'
+__version__ = '1.0.7'
